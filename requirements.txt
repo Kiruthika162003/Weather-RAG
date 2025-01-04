@@ -5,4 +5,5 @@ folium==0.14.0
 streamlit-folium
 beautifulsoup4==4.12.2
 sentence-transformers==2.2.2
+Pillow==10.0.0
 
