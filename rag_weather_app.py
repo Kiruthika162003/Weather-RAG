@@ -30,7 +30,6 @@ def parse_forecast(weather_data):
         date = day["date"]
         hourly_data = day["hourly"]
         for hour in hourly_data:
-            # Fix the hour['time'] format to match %H:%M
             time = hour["time"].zfill(4)  # Ensure it is zero-padded (e.g., '900' -> '0900')
             formatted_time = f"{date} {time[:2]}:{time[2:]}"  # Format as 'YYYY-MM-DD HH:MM'
 
@@ -47,8 +46,11 @@ def parse_forecast(weather_data):
 
 def calculate_comparison(feels_like):
     """Compare today's feels-like temperature with the last 3 days."""
-    today_avg = sum(feels_like[:8]) / len(feels_like[:8])  # Assuming 8-hourly data for today
-    past_3_days_avg = sum(feels_like[8:]) / len(feels_like[8:])  # Data for the past 3 days
+    if len(feels_like) < 24:  # Ensure enough data exists
+        return None, None, None
+
+    today_avg = sum(feels_like[:8]) / len(feels_like[:8])  # First 8 hours for today
+    past_3_days_avg = sum(feels_like[8:]) / len(feels_like[8:])  # Rest for past 3 days
     return today_avg, past_3_days_avg, today_avg - past_3_days_avg
 
 def plot_time_series(dates, values, ylabel, title, color="blue"):
@@ -63,35 +65,31 @@ def plot_time_series(dates, values, ylabel, title, color="blue"):
     st.pyplot(plt)
 
 def fetch_location_map(location):
-    """Fetch a static map image of the specified location."""
-    map_url = f"https://maps.googleapis.com/maps/api/staticmap?center={location}&zoom=10&size=600x400&maptype=roadmap"
+    """Fetch a map image for the given location using OpenStreetMap."""
+    map_url = f"https://www.mapquestapi.com/staticmap/v5/map?key=YOUR_MAPQUEST_API_KEY&center={location}&size=600,400&type=map"
     try:
         response = requests.get(map_url)
         if response.status_code == 200:
             img = Image.open(BytesIO(response.content))
             return img
         else:
-            st.warning("Unable to fetch the location map. Please check the location name.")
             return None
     except Exception as e:
-        st.error(f"Error fetching location map: {e}")
         return None
 
-def fetch_images(query, max_results=3):
-    """Fetch relevant images from Unsplash."""
+def fetch_images(query):
+    """Fetch relevant images using a simple fallback Unsplash API."""
     search_url = f"https://source.unsplash.com/600x400/?{query}"
     try:
         response = requests.get(search_url)
         if response.status_code == 200:
-            return [response.url] * max_results  # Return the same image for simplicity
+            return response.url
         else:
-            st.warning("Unable to fetch images. Please try again later.")
-            return []
-    except Exception as e:
-        st.error(f"Error fetching images: {e}")
-        return []
+            return None
+    except Exception:
+        return None
 
-# Initialize session state for persistent outputs
+# Initialize session state
 if "weather_data" not in st.session_state:
     st.session_state["weather_data"] = None
 if "location_map" not in st.session_state:
@@ -124,10 +122,12 @@ if st.session_state["weather_data"]:
     # Parse and plot time-series data
     dates, feels_like, temp, humidity = parse_forecast(weather)
     today_avg, past_3_days_avg, difference = calculate_comparison(feels_like)
-    st.write(f"### Comparison: Feels Like Temperature")
-    st.write(f"Today's average: {today_avg:.2f}°C")
-    st.write(f"Past 3 days' average: {past_3_days_avg:.2f}°C")
-    st.write(f"Difference: {difference:+.2f}°C")
+
+    if today_avg is not None:
+        st.write(f"### Comparison: Feels Like Temperature")
+        st.write(f"Today's average: {today_avg:.2f}°C")
+        st.write(f"Past 3 days' average: {past_3_days_avg:.2f}°C")
+        st.write(f"Difference: {difference:+.2f}°C")
 
     st.write("### Forecast for Feels Like Temperature")
     plot_time_series(dates, feels_like, "Feels Like (°C)", "Feels Like Temperature Over Time", color="orange")
@@ -140,9 +140,13 @@ if st.session_state["weather_data"]:
     location_map = st.session_state["location_map"]
     if location_map:
         st.image(location_map, caption=f"Map of {location}", use_column_width=True)
+    else:
+        st.warning("Unable to fetch location map. Please check your input.")
 
-    # Fetch and display weather images
+    # Display weather images
     st.write("### Relevant Weather Images")
-    images = fetch_images(f"{location} weather")
-    for img_url in images:
+    img_url = fetch_images(f"{location} weather")
+    if img_url:
         st.image(img_url, caption="Weather Image", use_column_width=True)
+    else:
+        st.warning("Unable to fetch weather images at this time.")
