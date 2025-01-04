@@ -1,4 +1,6 @@
- streamlit 
-sentence-transformers
-requests 
+streamlit
+requests
 matplotlib
+folium
+streamlit-folium 
+duckduckgo-search
