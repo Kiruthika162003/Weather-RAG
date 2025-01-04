@@ -60,14 +60,28 @@ def plot_time_series(dates, values, ylabel, title, color="blue"):
 def fetch_location_map(location):
     """Create a map for the specified location."""
     geocode_url = f"https://nominatim.openstreetmap.org/search?format=json&q={location}"
-    response = requests.get(geocode_url).json()
-    if response:
-        lat = float(response[0]["lat"])
-        lon = float(response[0]["lon"])
-        m = folium.Map(location=[lat, lon], zoom_start=10)
-        folium.Marker([lat, lon], popup=f"Location: {location}").add_to(m)
-        return m
-    return None
+    try:
+        response = requests.get(geocode_url)
+        if response.status_code == 200:
+            data = response.json()
+            if data:  # Check if the response has valid data
+                lat = float(data[0]["lat"])
+                lon = float(data[0]["lon"])
+                m = folium.Map(location=[lat, lon], zoom_start=10)
+                folium.Marker([lat, lon], popup=f"Location: {location}").add_to(m)
+                return m
+            else:
+                st.warning("No location data found. Please check the location name.")
+                return None
+        else:
+            st.error(f"Failed to fetch location data. HTTP status code: {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching location data: {e}")
+        return None
+    except ValueError as e:
+        st.error(f"Invalid response received: {e}")
+        return None
 
 def fetch_images(query, max_results=3):
     """Fetch relevant images by scraping Bing."""
