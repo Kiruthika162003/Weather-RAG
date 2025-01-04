@@ -26,14 +26,24 @@ def parse_forecast(weather_data):
     """Parse the weather forecast into time-series data."""
     forecast = weather_data["weather"]
     dates, feels_like, temp, humidity = [], [], [], []
+
     for day in forecast:
         date = day["date"]
         hourly_data = day["hourly"]
         for hour in hourly_data:
-            dates.append(datetime.strptime(f"{date} {hour['time']}00", "%Y-%m-%d %H%M"))
-            feels_like.append(float(hour["FeelsLikeC"]))
-            temp.append(float(hour["tempC"]))
-            humidity.append(float(hour["humidity"]))
+            # Fix the hour['time'] format to match %H:%M
+            time = hour["time"].zfill(4)  # Ensure it is zero-padded (e.g., '900' -> '0900')
+            formatted_time = f"{date} {time[:2]}:{time[2:]}"  # Format as 'YYYY-MM-DD HH:MM'
+
+            try:
+                dates.append(datetime.strptime(formatted_time, "%Y-%m-%d %H:%M"))
+                feels_like.append(float(hour["FeelsLikeC"]))
+                temp.append(float(hour["tempC"]))
+                humidity.append(float(hour["humidity"]))
+            except ValueError as e:
+                st.warning(f"Skipping invalid time entry: {formatted_time}")
+                continue
+
     return dates, feels_like, temp, humidity
 
 def plot_time_series(dates, values, ylabel, title, color="blue"):
