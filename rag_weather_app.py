@@ -18,7 +18,7 @@ def fetch_weather(location=""):
         if response.status_code == 200:
             return response.json()
         else:
-            return {"error": "Unable to fetch weather data"}
+            return {"error": f"Unable to fetch weather data. HTTP status code: {response.status_code}"}
     except Exception as e:
         return {"error": str(e)}
 
@@ -46,6 +46,12 @@ def parse_forecast(weather_data):
 
     return dates, feels_like, temp, humidity
 
+def calculate_comparison(feels_like):
+    """Compare today's feels-like temperature with the last 3 days."""
+    today_avg = sum(feels_like[:8]) / len(feels_like[:8])  # Assuming 8-hourly data for today
+    past_3_days_avg = sum(feels_like[8:]) / len(feels_like[8:])  # Data for the past 3 days
+    return today_avg, past_3_days_avg, today_avg - past_3_days_avg
+
 def plot_time_series(dates, values, ylabel, title, color="blue"):
     """Plot a time-series graph."""
     plt.figure(figsize=(10, 5))
@@ -60,8 +66,9 @@ def plot_time_series(dates, values, ylabel, title, color="blue"):
 def fetch_location_map(location):
     """Create a map for the specified location."""
     geocode_url = f"https://nominatim.openstreetmap.org/search?format=json&q={location}"
+    headers = {"User-Agent": "WeatherApp/1.0 (contact@example.com)"}  # Add a valid User-Agent
     try:
-        response = requests.get(geocode_url)
+        response = requests.get(geocode_url, headers=headers)
         if response.status_code == 200:
             data = response.json()
             if data:  # Check if the response has valid data
@@ -78,9 +85,6 @@ def fetch_location_map(location):
             return None
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching location data: {e}")
-        return None
-    except ValueError as e:
-        st.error(f"Invalid response received: {e}")
         return None
 
 def fetch_images(query, max_results=3):
@@ -109,10 +113,20 @@ if st.button("Get Weather"):
     if "error" in weather:
         st.error(weather["error"])
     else:
-        st.success(f"Showing weather for {location.capitalize()}")
+        # Display current weather
+        current_condition = weather["current_condition"][0]
+        current_temp = float(current_condition["temp_C"])
+        feels_like_now = float(current_condition["FeelsLikeC"])
+        st.success(f"Current Temperature: {current_temp}°C | Feels Like: {feels_like_now}°C")
 
         # Parse and plot time-series data
         dates, feels_like, temp, humidity = parse_forecast(weather)
+        today_avg, past_3_days_avg, difference = calculate_comparison(feels_like)
+        st.write(f"### Comparison: Feels Like Temperature")
+        st.write(f"Today's average: {today_avg:.2f}°C")
+        st.write(f"Past 3 days' average: {past_3_days_avg:.2f}°C")
+        st.write(f"Difference: {difference:+.2f}°C")
+
         st.write("### Forecast for Feels Like Temperature")
         plot_time_series(dates, feels_like, "Feels Like (°C)", "Feels Like Temperature Over Time", color="orange")
 
