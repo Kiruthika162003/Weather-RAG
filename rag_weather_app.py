@@ -21,12 +21,17 @@ def fetch_location_coordinates(location):
     """Fetch latitude and longitude using OpenStreetMap's Nominatim."""
     try:
         geocode_url = f"https://nominatim.openstreetmap.org/search?q={location}&format=json&limit=1"
-        response = requests.get(geocode_url)
-        if response.status_code == 200 and response.json():
-            data = response.json()[0]
-            return float(data["lat"]), float(data["lon"])
+        headers = {"User-Agent": "WeatherExplorerApp/1.0 (contact@example.com)"}
+        response = requests.get(geocode_url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return float(data[0]["lat"]), float(data[0]["lon"])
+            else:
+                st.warning(f"Location '{location}' not found. Please try a more specific name.")
+                return None, None
         else:
-            st.warning(f"Failed to fetch location coordinates for {location}. Please try a different location.")
+            st.error(f"Failed to fetch location coordinates. HTTP Status Code: {response.status_code}")
             return None, None
     except Exception as e:
         st.error(f"Error fetching location coordinates: {e}")
