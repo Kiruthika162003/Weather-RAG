@@ -101,6 +101,7 @@ def fetch_images(query, max_results=3):
     return image_results
 
 # Streamlit App
+st.set_page_config(layout="wide", page_title="Weather Forecast App 🌦️")
 st.title("Weather Forecast with Real-Time Data and Images 🌦️")
 st.sidebar.header("Navigation")
 st.sidebar.write("Use this app to check real-time weather data with forecasts, maps, and relevant images.")
@@ -108,41 +109,45 @@ st.sidebar.write("Use this app to check real-time weather data with forecasts, m
 # Section 1: Weather Search
 st.header("🌦️ Real-Time Weather Forecast")
 location = st.text_input("Enter a location (e.g., 'New York', 'London'):", value="London")
+container = st.container()
+
 if st.button("Get Weather"):
-    weather = fetch_weather(location)
-    if "error" in weather:
-        st.error(weather["error"])
-    else:
-        # Display current weather
-        current_condition = weather["current_condition"][0]
-        current_temp = float(current_condition["temp_C"])
-        feels_like_now = float(current_condition["FeelsLikeC"])
-        st.success(f"Current Temperature: {current_temp}°C | Feels Like: {feels_like_now}°C")
-
-        # Parse and plot time-series data
-        dates, feels_like, temp, humidity = parse_forecast(weather)
-        today_avg, past_3_days_avg, difference = calculate_comparison(feels_like)
-        st.write(f"### Comparison: Feels Like Temperature")
-        st.write(f"Today's average: {today_avg:.2f}°C")
-        st.write(f"Past 3 days' average: {past_3_days_avg:.2f}°C")
-        st.write(f"Difference: {difference:+.2f}°C")
-
-        st.write("### Forecast for Feels Like Temperature")
-        plot_time_series(dates, feels_like, "Feels Like (°C)", "Feels Like Temperature Over Time", color="orange")
-
-        st.write("### Forecast for Humidity")
-        plot_time_series(dates, humidity, "Humidity (%)", "Humidity Over Time", color="green")
-
-        # Display location map
-        st.write("### Location Map")
-        location_map = fetch_location_map(location)
-        if location_map:
-            st_folium(location_map, width=700, height=500)
+    with container:
+        weather = fetch_weather(location)
+        if "error" in weather:
+            st.error(weather["error"])
         else:
-            st.warning("Unable to fetch location map.")
+            # Display current weather
+            current_condition = weather["current_condition"][0]
+            current_temp = float(current_condition["temp_C"])
+            feels_like_now = float(current_condition["FeelsLikeC"])
+            st.success(f"Current Temperature: {current_temp}°C | Feels Like: {feels_like_now}°C")
 
-        # Fetch and display weather images
-        st.write("### Relevant Weather Images")
-        images = fetch_images(f"{location} weather")
-        for img_url in images:
-            st.image(img_url, caption="Weather Image", use_column_width=True)
+            # Parse and plot time-series data
+            dates, feels_like, temp, humidity = parse_forecast(weather)
+            today_avg, past_3_days_avg, difference = calculate_comparison(feels_like)
+            st.write(f"### Comparison: Feels Like Temperature")
+            st.write(f"Today's average: {today_avg:.2f}°C")
+            st.write(f"Past 3 days' average: {past_3_days_avg:.2f}°C")
+            st.write(f"Difference: {difference:+.2f}°C")
+
+            # Plot time-series data
+            st.write("### Forecast for Feels Like Temperature")
+            plot_time_series(dates, feels_like, "Feels Like (°C)", "Feels Like Temperature Over Time", color="orange")
+
+            st.write("### Forecast for Humidity")
+            plot_time_series(dates, humidity, "Humidity (%)", "Humidity Over Time", color="green")
+
+            # Display location map
+            st.write("### Location Map")
+            location_map = fetch_location_map(location)
+            if location_map:
+                st_folium(location_map, width=700, height=500)
+            else:
+                st.warning("Unable to fetch location map.")
+
+            # Fetch and display weather images
+            st.write("### Relevant Weather Images")
+            images = fetch_images(f"{location} weather")
+            for img_url in images:
+                st.image(img_url, caption="Weather Image", use_column_width=True)
