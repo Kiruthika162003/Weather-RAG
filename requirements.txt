@@ -1,9 +1,8 @@
-streamlit==1.27.2
+streamlit==1.41.1
 requests==2.31.0
 matplotlib==3.8.0
 folium==0.14.0
-streamlit-folium==0.12.1
+streamlit-folium==0.12.0
 duckduckgo-search==2.8.7
 beautifulsoup4==4.12.2
 sentence-transformers==2.2.2
-
