@@ -2,9 +2,8 @@ import streamlit as st
 import requests
 import matplotlib.pyplot as plt
 from datetime import datetime
-import folium
-from streamlit_folium import st_folium
-from bs4 import BeautifulSoup
+from PIL import Image
+from io import BytesIO
 
 # Weather API endpoint
 WEATHER_API_URL = "https://wttr.in"
@@ -64,41 +63,39 @@ def plot_time_series(dates, values, ylabel, title, color="blue"):
     st.pyplot(plt)
 
 def fetch_location_map(location):
-    """Create a map for the specified location."""
-    geocode_url = f"https://nominatim.openstreetmap.org/search?format=json&q={location}"
-    headers = {"User-Agent": "WeatherApp/1.0 (contact@example.com)"}  # Add a valid User-Agent
+    """Fetch a static map image of the specified location."""
+    map_url = f"https://maps.googleapis.com/maps/api/staticmap?center={location}&zoom=10&size=600x400&maptype=roadmap"
     try:
-        response = requests.get(geocode_url, headers=headers)
+        response = requests.get(map_url)
         if response.status_code == 200:
-            data = response.json()
-            if data:  # Check if the response has valid data
-                lat = float(data[0]["lat"])
-                lon = float(data[0]["lon"])
-                m = folium.Map(location=[lat, lon], zoom_start=10)
-                folium.Marker([lat, lon], popup=f"Location: {location}").add_to(m)
-                return m
-            else:
-                st.warning("No location data found. Please check the location name.")
-                return None
+            img = Image.open(BytesIO(response.content))
+            return img
         else:
-            st.error(f"Failed to fetch location data. HTTP status code: {response.status_code}")
+            st.warning("Unable to fetch the location map. Please check the location name.")
             return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching location data: {e}")
+    except Exception as e:
+        st.error(f"Error fetching location map: {e}")
         return None
 
 def fetch_images(query, max_results=3):
-    """Fetch relevant images by scraping Bing."""
-    url = f"https://www.bing.com/images/search?q={query}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-    image_results = []
-    for img_tag in soup.find_all("img", limit=max_results):
-        src = img_tag.get("src")
-        if src and src.startswith("http"):
-            image_results.append(src)
-    return image_results
+    """Fetch relevant images from Unsplash."""
+    search_url = f"https://source.unsplash.com/600x400/?{query}"
+    try:
+        response = requests.get(search_url)
+        if response.status_code == 200:
+            return [response.url] * max_results  # Return the same image for simplicity
+        else:
+            st.warning("Unable to fetch images. Please try again later.")
+            return []
+    except Exception as e:
+        st.error(f"Error fetching images: {e}")
+        return []
+
+# Initialize session state for persistent outputs
+if "weather_data" not in st.session_state:
+    st.session_state["weather_data"] = None
+if "location_map" not in st.session_state:
+    st.session_state["location_map"] = None
 
 # Streamlit App
 st.set_page_config(layout="wide", page_title="Weather Forecast App 🌦️")
@@ -109,45 +106,43 @@ st.sidebar.write("Use this app to check real-time weather data with forecasts, m
 # Section 1: Weather Search
 st.header("🌦️ Real-Time Weather Forecast")
 location = st.text_input("Enter a location (e.g., 'New York', 'London'):", value="London")
-container = st.container()
-
 if st.button("Get Weather"):
-    with container:
-        weather = fetch_weather(location)
-        if "error" in weather:
-            st.error(weather["error"])
-        else:
-            # Display current weather
-            current_condition = weather["current_condition"][0]
-            current_temp = float(current_condition["temp_C"])
-            feels_like_now = float(current_condition["FeelsLikeC"])
-            st.success(f"Current Temperature: {current_temp}°C | Feels Like: {feels_like_now}°C")
+    weather = fetch_weather(location)
+    if "error" in weather:
+        st.error(weather["error"])
+    else:
+        st.session_state["weather_data"] = weather
+        st.session_state["location_map"] = fetch_location_map(location)
 
-            # Parse and plot time-series data
-            dates, feels_like, temp, humidity = parse_forecast(weather)
-            today_avg, past_3_days_avg, difference = calculate_comparison(feels_like)
-            st.write(f"### Comparison: Feels Like Temperature")
-            st.write(f"Today's average: {today_avg:.2f}°C")
-            st.write(f"Past 3 days' average: {past_3_days_avg:.2f}°C")
-            st.write(f"Difference: {difference:+.2f}°C")
+if st.session_state["weather_data"]:
+    weather = st.session_state["weather_data"]
+    current_condition = weather["current_condition"][0]
+    current_temp = float(current_condition["temp_C"])
+    feels_like_now = float(current_condition["FeelsLikeC"])
+    st.success(f"Current Temperature: {current_temp}°C | Feels Like: {feels_like_now}°C")
 
-            # Plot time-series data
-            st.write("### Forecast for Feels Like Temperature")
-            plot_time_series(dates, feels_like, "Feels Like (°C)", "Feels Like Temperature Over Time", color="orange")
+    # Parse and plot time-series data
+    dates, feels_like, temp, humidity = parse_forecast(weather)
+    today_avg, past_3_days_avg, difference = calculate_comparison(feels_like)
+    st.write(f"### Comparison: Feels Like Temperature")
+    st.write(f"Today's average: {today_avg:.2f}°C")
+    st.write(f"Past 3 days' average: {past_3_days_avg:.2f}°C")
+    st.write(f"Difference: {difference:+.2f}°C")
 
-            st.write("### Forecast for Humidity")
-            plot_time_series(dates, humidity, "Humidity (%)", "Humidity Over Time", color="green")
+    st.write("### Forecast for Feels Like Temperature")
+    plot_time_series(dates, feels_like, "Feels Like (°C)", "Feels Like Temperature Over Time", color="orange")
 
-            # Display location map
-            st.write("### Location Map")
-            location_map = fetch_location_map(location)
-            if location_map:
-                st_folium(location_map, width=700, height=500)
-            else:
-                st.warning("Unable to fetch location map.")
+    st.write("### Forecast for Humidity")
+    plot_time_series(dates, humidity, "Humidity (%)", "Humidity Over Time", color="green")
 
-            # Fetch and display weather images
-            st.write("### Relevant Weather Images")
-            images = fetch_images(f"{location} weather")
-            for img_url in images:
-                st.image(img_url, caption="Weather Image", use_column_width=True)
+    # Display location map
+    st.write("### Location Map")
+    location_map = st.session_state["location_map"]
+    if location_map:
+        st.image(location_map, caption=f"Map of {location}", use_column_width=True)
+
+    # Fetch and display weather images
+    st.write("### Relevant Weather Images")
+    images = fetch_images(f"{location} weather")
+    for img_url in images:
+        st.image(img_url, caption="Weather Image", use_column_width=True)
