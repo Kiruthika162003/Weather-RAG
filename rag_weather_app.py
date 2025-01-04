@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import folium
 from streamlit_folium import st_folium
-from duckduckgo_search import ddg_images
+from bs4 import BeautifulSoup
 
 # Weather API endpoint
 WEATHER_API_URL = "https://wttr.in"
@@ -60,9 +60,17 @@ def fetch_location_map(location):
     return None
 
 def fetch_images(query, max_results=3):
-    """Fetch relevant images from DuckDuckGo."""
-    results = ddg_images(query, max_results=max_results)
-    return [result["image"] for result in results]
+    """Fetch relevant images by scraping Bing."""
+    url = f"https://www.bing.com/images/search?q={query}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    image_results = []
+    for img_tag in soup.find_all("img", limit=max_results):
+        src = img_tag.get("src")
+        if src and src.startswith("http"):
+            image_results.append(src)
+    return image_results
 
 # Streamlit App
 st.title("Weather Forecast with Real-Time Data and Images 🌦️")
