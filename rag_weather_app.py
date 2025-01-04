@@ -2,8 +2,6 @@ import streamlit as st
 import requests
 import folium
 from streamlit_folium import st_folium
-from PIL import Image
-from io import BytesIO
 
 # Helper Functions
 def fetch_weather(location):
@@ -22,13 +20,13 @@ def fetch_weather(location):
 def fetch_location_coordinates(location):
     """Fetch latitude and longitude using OpenStreetMap's Nominatim."""
     try:
-        geocode_url = f"https://nominatim.openstreetmap.org/search?q={location}&format=json"
+        geocode_url = f"https://nominatim.openstreetmap.org/search?q={location}&format=json&limit=1"
         response = requests.get(geocode_url)
         if response.status_code == 200 and response.json():
             data = response.json()[0]
             return float(data["lat"]), float(data["lon"])
         else:
-            st.warning(f"Failed to fetch location coordinates for {location}.")
+            st.warning(f"Failed to fetch location coordinates for {location}. Please try a different location.")
             return None, None
     except Exception as e:
         st.error(f"Error fetching location coordinates: {e}")
@@ -74,11 +72,11 @@ if st.button("Get Weather"):
         st.subheader(f"🌤️ Current Weather in {location.capitalize()}")
         st.metric("Temperature", f"{temp}°C")
         st.metric("Feels Like", f"{feels_like}°C")
-        st.metric("Condition", weather_desc)
+        st.metric("Condition", weather_desc.capitalize())
 
         # Fetch location coordinates
         lat, lon = fetch_location_coordinates(location)
-        if lat and lon:
+        if lat is not None and lon is not None:
             st.subheader("📍 Location Map")
             map_object = create_location_map(lat, lon, location)
             if map_object:
@@ -92,6 +90,6 @@ if st.button("Get Weather"):
         st.subheader("🌄 Location Images")
         image_url = fetch_images_from_unsplash(location)
         if image_url:
-            st.image(image_url, caption=f"Beautiful view of {location.capitalize()}", use_column_width=True)
+            st.image(image_url, caption=f"Beautiful view of {location.capitalize()}", use_container_width=True)
         else:
             st.warning("No images found for this location.")
